@@ -39,7 +39,8 @@ function App(){
   const [service,setService] =
     useState<ServiceType|'all'>('all');
 
-  const [city,setCity] = useState('Miami');
+  const [city,setCity] =
+    useState('Miami');
 
   const [caregivers,setCaregivers] =
     useState<Caregiver[]>(demoCaregivers);
@@ -47,7 +48,8 @@ function App(){
   const [selected,setSelected] =
     useState<Caregiver|null>(null);
 
-  const [authOpen,setAuthOpen] = useState(false);
+  const [authOpen,setAuthOpen] =
+    useState(false);
 
   const [bookingOpen,setBookingOpen] =
     useState<Caregiver|null>(null);
@@ -55,26 +57,34 @@ function App(){
   const [role,setRole] =
     useState<Role>('pet_parent');
 
-  const [user,setUser] = useState<any>(null);
+  const [user,setUser] =
+    useState<any>(null);
 
-  const [toast,setToast] = useState('');
+  const [toast,setToast] =
+    useState('');
 
-  const [mobile,setMobile] = useState(false);
+  const [mobile,setMobile] =
+    useState(false);
 
-  const [settings,setSettings] = useState({
-    platformFeePct:20,
-    fixedFee:0,
-    holdDays:2
-  });
+  const [settings,setSettings] =
+    useState({
+      platformFeePct:20,
+      fixedFee:0,
+      holdDays:2
+    });
 
   const [bookings,setBookings] =
     useState<Booking[]>([]);
 
+
   useEffect(()=>{
 
-    if(!supabase) return;
+    const client = supabase;
 
-    supabase.auth.getUser().then(async({data})=>{
+    if(!client) return;
+
+
+    client.auth.getUser().then(async({data})=>{
 
       const currentUser = data.user;
 
@@ -82,43 +92,50 @@ function App(){
 
       if(currentUser?.id){
 
-        const {data:profile} = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id',currentUser.id)
-          .maybeSingle();
-
-        if(profile?.role){
-          setRole(profile.role as Role);
-        }
-      }
-    });
-
-    const {
-      data:sub
-    } = supabase.auth.onAuthStateChange(
-      async(_e,s)=>{
-
-        const currentUser = s?.user ?? null;
-
-        setUser(currentUser);
-
-        if(currentUser?.id){
-
-          const {data:profile} = await supabase
+        const {data:profile} =
+          await client
             .from('profiles')
             .select('role')
             .eq('id',currentUser.id)
             .maybeSingle();
 
-          if(profile?.role){
-            setRole(profile.role as Role);
-          }
+        if(profile?.role){
+          setRole(profile.role as Role);
         }
       }
-    );
+
+    });
+
+
+    const {data:sub} =
+      client.auth.onAuthStateChange(
+        async(_event,session)=>{
+
+          const currentUser =
+            session?.user ?? null;
+
+          setUser(currentUser);
+
+          if(currentUser?.id){
+
+            const {data:profile} =
+              await client
+                .from('profiles')
+                .select('role')
+                .eq('id',currentUser.id)
+                .maybeSingle();
+
+            if(profile?.role){
+              setRole(profile.role as Role);
+            }
+          }
+
+        }
+      );
+
 
     loadCaregivers();
+
 
     return()=>{
       sub.subscription.unsubscribe();
@@ -126,32 +143,42 @@ function App(){
 
   },[]);
 
+
   async function loadCaregivers(){
 
-    if(!supabase) return;
+    const client = supabase;
 
-    const {data} = await supabase
-      .from('caregiver_public')
-      .select('*')
-      .order('rating',{ascending:false});
+    if(!client) return;
+
+    const {data} =
+      await client
+        .from('caregiver_public')
+        .select('*')
+        .order('rating',{ascending:false});
 
     if(data?.length){
       setCaregivers(data as Caregiver[]);
     }
   }
 
-  const filtered = useMemo(
-    ()=>caregivers.filter(c=>
-      (service==='all'||c.services.includes(service)) &&
-      (!city ||
-        c.city
-          .toLowerCase()
-          .includes(city.toLowerCase()))
-    ),
-    [caregivers,service,city]
-  );
+
+  const filtered =
+    useMemo(
+      ()=>caregivers.filter(c=>
+        (service==='all'||c.services.includes(service)) &&
+        (
+          !city ||
+          c.city
+            .toLowerCase()
+            .includes(city.toLowerCase())
+        )
+      ),
+      [caregivers,service,city]
+    );
+
 
   const nav = (v:any)=>{
+
     setView(v);
     setMobile(false);
 
@@ -159,16 +186,21 @@ function App(){
       top:0,
       behavior:'smooth'
     });
+
   };
 
-  const notify = (m:string)=>{
-    setToast(m);
+
+  const notify = (message:string)=>{
+
+    setToast(message);
 
     setTimeout(
       ()=>setToast(''),
       3200
     );
+
   };
+
 
   async function logout(){
 
@@ -180,13 +212,17 @@ function App(){
     setRole('pet_parent');
 
     nav('home');
+
   }
+
 
   const editProfile = ()=>{
     nav('profile');
   };
 
+
   return (
+
     <div className="app">
 
       <header className="header">
@@ -197,6 +233,7 @@ function App(){
             className="brand"
             onClick={()=>nav('home')}
           >
+
             <span className="brandmark">
               <PawPrint size={19}/>
             </span>
@@ -204,15 +241,27 @@ function App(){
             <span>
               Pet<span>Care</span>
             </span>
+
           </button>
 
-          <nav className={mobile?'nav open':'nav'}>
 
-            <button onClick={()=>nav('search')}>
+          <nav
+            className={
+              mobile
+                ? 'nav open'
+                : 'nav'
+            }
+          >
+
+            <button
+              onClick={()=>nav('search')}
+            >
               Find care
             </button>
 
-            <button onClick={()=>nav('search')}>
+            <button
+              onClick={()=>nav('search')}
+            >
               Services
             </button>
 
@@ -226,12 +275,15 @@ function App(){
             </button>
 
             {user?.email?.includes('admin') &&
-              <button onClick={()=>nav('admin')}>
+              <button
+                onClick={()=>nav('admin')}
+              >
                 Admin
               </button>
             }
 
           </nav>
+
 
           <div className="navactions">
 
@@ -239,8 +291,9 @@ function App(){
               className="iconbtn mobilemenu"
               onClick={()=>setMobile(!mobile)}
             >
-              {mobile?<X/>:<Menu/>}
+              {mobile ? <X/> : <Menu/>}
             </button>
+
 
             {user ?
 
@@ -248,8 +301,13 @@ function App(){
                 className="avatarbtn"
                 onClick={()=>nav('dashboard')}
               >
+
                 <UserRound size={18}/>
-                <span>My account</span>
+
+                <span>
+                  My account
+                </span>
+
               </button>
 
               :
@@ -260,6 +318,7 @@ function App(){
               >
                 Sign in
               </button>
+
             }
 
           </div>
@@ -300,7 +359,8 @@ function App(){
       }
 
 
-      {view==='caregiver' && selected &&
+      {view==='caregiver' &&
+        selected &&
         <CaregiverPage
           caregiver={selected}
           onBack={()=>nav('search')}
@@ -317,28 +377,35 @@ function App(){
           onRole={setRole}
           onBook={()=>nav('search')}
           onLogout={logout}
-
           onEditProfile={editProfile}
 
           onConnect={async()=>{
 
-            if(!supabase){
+            const client = supabase;
+
+            if(!client){
+
               notify(
                 'Demo mode: connect is ready in the Supabase Edge Functions.'
               );
+
               return;
             }
+
 
             const {
               data:acct,
               error
             } =
-              await supabase.functions.invoke(
+              await client.functions.invoke(
                 'create-connect-account',
-                {body:{}}
+                {
+                  body:{}
+                }
               );
 
-            if(error||acct?.error){
+
+            if(error || acct?.error){
 
               notify(
                 error?.message ||
@@ -349,16 +416,20 @@ function App(){
               return;
             }
 
+
             const {
               data:link,
               error:linkErr
             } =
-              await supabase.functions.invoke(
+              await client.functions.invoke(
                 'create-account-link',
-                {body:{}}
+                {
+                  body:{}
+                }
               );
 
-            if(linkErr||link?.error){
+
+            if(linkErr || link?.error){
 
               notify(
                 linkErr?.message ||
@@ -369,8 +440,10 @@ function App(){
               return;
             }
 
+
             if(link?.url){
-              window.location.href=link.url;
+              window.location.href =
+                link.url;
             }
 
           }}
@@ -393,9 +466,12 @@ function App(){
         <Admin
           settings={settings}
           setSettings={setSettings}
+
           onSave={async()=>{
 
-            if(!supabase){
+            const client = supabase;
+
+            if(!client){
 
               notify(
                 'Demo mode: settings are local to this preview.'
@@ -404,22 +480,27 @@ function App(){
               return;
             }
 
+
             const {
               data,
               error
             } =
-              await supabase.functions.invoke(
+              await client.functions.invoke(
                 'admin-settings',
                 {
                   body:{
-                    platform_fee_pct:settings.platformFeePct,
-                    fixed_fee:settings.fixedFee,
-                    hold_days:settings.holdDays
+                    platform_fee_pct:
+                      settings.platformFeePct,
+                    fixed_fee:
+                      settings.fixedFee,
+                    hold_days:
+                      settings.holdDays
                   }
                 }
               );
 
-            if(error||data?.error){
+
+            if(error || data?.error){
 
               notify(
                 error?.message ||
@@ -430,9 +511,11 @@ function App(){
               return;
             }
 
+
             notify(
               'Marketplace settings saved'
             );
+
           }}
         />
       }
@@ -463,13 +546,19 @@ function App(){
 
           <div>
 
-            <b>Pet parents</b>
+            <b>
+              Pet parents
+            </b>
 
-            <button onClick={()=>nav('search')}>
+            <button
+              onClick={()=>nav('search')}
+            >
               Find a caregiver
             </button>
 
-            <button onClick={()=>nav('search')}>
+            <button
+              onClick={()=>nav('search')}
+            >
               How it works
             </button>
 
@@ -478,7 +567,9 @@ function App(){
 
           <div>
 
-            <b>Caregivers</b>
+            <b>
+              Caregivers
+            </b>
 
             <button
               onClick={()=>{
@@ -489,7 +580,9 @@ function App(){
               Join PetCare
             </button>
 
-            <button onClick={()=>nav('dashboard')}>
+            <button
+              onClick={()=>nav('dashboard')}
+            >
               Caregiver dashboard
             </button>
 
@@ -498,10 +591,17 @@ function App(){
 
           <div>
 
-            <b>Trust & safety</b>
+            <b>
+              Trust & safety
+            </b>
 
-            <button>Payments</button>
-            <button>Privacy</button>
+            <button>
+              Payments
+            </button>
+
+            <button>
+              Privacy
+            </button>
 
           </div>
 
@@ -509,7 +609,9 @@ function App(){
 
 
         <div className="container copyright">
+
           © 2026 PetCare. MVP.
+
         </div>
 
       </footer>
@@ -520,12 +622,14 @@ function App(){
           role={role}
           setRole={setRole}
           onClose={()=>setAuthOpen(false)}
+
           onSuccess={(u)=>{
             setUser(u);
             setAuthOpen(false);
             notify('Welcome to PetCare');
             nav('dashboard');
           }}
+
           notify={notify}
         />
       }
@@ -537,11 +641,21 @@ function App(){
           feePct={settings.platformFeePct}
           fixedFee={settings.fixedFee}
           user={user}
-          onClose={()=>setBookingOpen(null)}
+
+          onClose={()=>
+            setBookingOpen(null)
+          }
+
           onDone={(b)=>{
-            setBookings(x=>[b,...x]);
+            setBookings(
+              x=>[b,...x]
+            );
+
             setBookingOpen(null);
-            notify('Booking request created');
+
+            notify(
+              'Booking request created'
+            );
           }}
         />
       }
@@ -549,12 +663,16 @@ function App(){
 
       {toast &&
         <div className="toast">
+
           <CheckCircle2 size={18}/>
+
           {toast}
+
         </div>
       }
 
     </div>
+
   );
 }
 
@@ -568,10 +686,13 @@ function Home({
 }){
 
   const [s,setS] =
-    useState<ServiceType|'all'>('walking');
+    useState<ServiceType|'all'>(
+      'walking'
+    );
 
   const [c,setC] =
     useState('Miami');
+
 
   return <>
 
@@ -582,18 +703,25 @@ function Home({
         <div className="heroCopy">
 
           <div className="eyebrow">
+
             <ShieldCheck size={15}/>
+
             Built around trust
+
           </div>
+
 
           <h1>
             Pet care that feels <em>like home.</em>
           </h1>
 
+
           <p>
-            Find trusted local caregivers for walks and day care,
-            compare profiles, and request care in a few simple steps.
+            Find trusted local caregivers for walks
+            and day care, compare profiles, and
+            request care in a few simple steps.
           </p>
+
 
           <div className="searchbox">
 
@@ -603,14 +731,20 @@ function Home({
 
               <div>
 
-                <label>Service</label>
+                <label>
+                  Service
+                </label>
 
                 <select
                   value={s}
-                  onChange={e=>
-                    setS(e.target.value as any)
+                  onChange={
+                    e=>
+                      setS(
+                        e.target.value as any
+                      )
                   }
                 >
+
                   <option value="walking">
                     Dog walking
                   </option>
@@ -636,11 +770,15 @@ function Home({
 
               <div>
 
-                <label>Where</label>
+                <label>
+                  Where
+                </label>
 
                 <input
                   value={c}
-                  onChange={e=>setC(e.target.value)}
+                  onChange={
+                    e=>setC(e.target.value)
+                  }
                   placeholder="City"
                 />
 
@@ -651,7 +789,9 @@ function Home({
 
             <button
               className="primary searchbtn"
-              onClick={()=>onSearch(s,c)}
+              onClick={()=>
+                onSearch(s,c)
+              }
             >
               Search
             </button>
@@ -690,6 +830,7 @@ function Home({
             <div className="photoemoji">
               🐶
             </div>
+
 
             <div className="floatingCard">
 
@@ -740,9 +881,12 @@ function Home({
 
           </div>
 
+
           <button
             className="textbtn"
-            onClick={()=>onSearch('all','Miami')}
+            onClick={()=>
+              onSearch('all','Miami')
+            }
           >
             Explore all
             <ChevronRight size={17}/>
@@ -754,10 +898,13 @@ function Home({
         <div className="servicegrid">
 
           {services.map(x=>
+
             <button
               className="serviceCard"
               key={x.id}
-              onClick={()=>onSearch(x.id,'Miami')}
+              onClick={()=>
+                onSearch(x.id,'Miami')
+              }
             >
 
               <span className="serviceicon">
@@ -766,14 +913,20 @@ function Home({
 
               <div>
 
-                <h3>{x.title}</h3>
-                <p>{x.subtitle}</p>
+                <h3>
+                  {x.title}
+                </h3>
+
+                <p>
+                  {x.subtitle}
+                </p>
 
               </div>
 
               <ChevronRight/>
 
             </button>
+
           )}
 
         </div>
@@ -817,27 +970,53 @@ function Home({
         <div className="featurelist">
 
           <div>
-            <span>01</span>
-            <b>Create your profile</b>
+
+            <span>
+              01
+            </span>
+
+            <b>
+              Create your profile
+            </b>
+
             <p>
               Tell families about your experience and availability.
             </p>
+
           </div>
 
+
           <div>
-            <span>02</span>
-            <b>Get booked</b>
+
+            <span>
+              02
+            </span>
+
+            <b>
+              Get booked
+            </b>
+
             <p>
               Accept requests that fit your schedule.
             </p>
+
           </div>
 
+
           <div>
-            <span>03</span>
-            <b>Get paid</b>
+
+            <span>
+              03
+            </span>
+
+            <b>
+              Get paid
+            </b>
+
             <p>
               Connect Stripe for verified payouts.
             </p>
+
           </div>
 
         </div>
@@ -894,15 +1073,22 @@ function SearchPage({
           </h1>
 
           <p>
-            {caregivers.length} caregivers in or near {city || 'your area'}.
+            {caregivers.length}
+            {' '}
+            caregivers in or near
+            {' '}
+            {city || 'your area'}.
           </p>
 
         </div>
 
 
         <button className="filterbtn">
+
           <SlidersHorizontal size={17}/>
+
           Filters
+
         </button>
 
       </div>
@@ -916,7 +1102,9 @@ function SearchPage({
 
           <input
             value={city}
-            onChange={e=>setCity(e.target.value)}
+            onChange={
+              e=>setCity(e.target.value)
+            }
             placeholder="City"
           />
 
@@ -924,6 +1112,7 @@ function SearchPage({
 
 
         {services.map(x=>
+
           <button
             key={x.id}
             className={
@@ -931,10 +1120,13 @@ function SearchPage({
                 ? 'pill active'
                 : 'pill'
             }
-            onClick={()=>setService(x.id)}
+            onClick={()=>
+              setService(x.id)
+            }
           >
             {x.icon} {x.title}
           </button>
+
         )}
 
 
@@ -944,7 +1136,9 @@ function SearchPage({
               ? 'pill active'
               : 'pill'
           }
-          onClick={()=>setService('all')}
+          onClick={()=>
+            setService('all')
+          }
         >
           All
         </button>
@@ -955,18 +1149,24 @@ function SearchPage({
       <div className="cards">
 
         {caregivers.map(c=>
+
           <CaregiverCard
             key={c.id}
             c={c}
-            onClick={()=>onSelect(c)}
+            onClick={()=>
+              onSelect(c)
+            }
           />
+
         )}
 
 
         {!caregivers.length &&
           <div className="empty">
 
-            <div>🐾</div>
+            <div>
+              🐾
+            </div>
 
             <h3>
               No caregivers found yet
@@ -974,8 +1174,8 @@ function SearchPage({
 
             <p>
               Try another city or service.
-              In Supabase mode, approved caregiver profiles
-              appear here automatically.
+              In Supabase mode, approved caregiver
+              profiles appear here automatically.
             </p>
 
           </div>
@@ -1016,9 +1216,13 @@ function CaregiverCard({
 
         </div>
 
+
         <span className="verified">
+
           <ShieldCheck size={13}/>
+
           Verified
+
         </span>
 
       </div>
@@ -1033,8 +1237,13 @@ function CaregiverCard({
           </h3>
 
           <span>
+
             {money(c.hourly_rate)}
-            <small>/service</small>
+
+            <small>
+              /service
+            </small>
+
           </span>
 
         </div>
@@ -1053,7 +1262,9 @@ function CaregiverCard({
             ({c.review_count})
           </span>
 
-          · {c.city}, {c.state}
+          {' · '}
+
+          {c.city}, {c.state}
 
         </div>
 
@@ -1066,11 +1277,15 @@ function CaregiverCard({
         <div className="tagrow">
 
           {c.services.map(s=>
+
             <span key={s}>
+
               {s==='walking'
                 ? 'Paseos'
                 : 'Guardería'}
+
             </span>
+
           )}
 
         </div>
@@ -1124,13 +1339,18 @@ function CaregiverPage({
           <div>
 
             <span className="verifiedText">
+
               <ShieldCheck size={15}/>
+
               Identity & profile review
+
             </span>
+
 
             <h1>
               {caregiver.display_name}
             </h1>
+
 
             <div className="rating big">
 
@@ -1140,8 +1360,10 @@ function CaregiverPage({
               />
 
               {caregiver.rating.toFixed(1)}
-              · {caregiver.review_count} reviews
-              · {caregiver.city}, {caregiver.state}
+              {' · '}
+              {caregiver.review_count} reviews
+              {' · '}
+              {caregiver.city}, {caregiver.state}
 
             </div>
 
@@ -1174,18 +1396,41 @@ function CaregiverPage({
             <div className="stats">
 
               <div>
-                <b>{caregiver.years_experience}</b>
-                <span>years experience</span>
+
+                <b>
+                  {caregiver.years_experience}
+                </b>
+
+                <span>
+                  years experience
+                </span>
+
               </div>
 
-              <div>
-                <b>{caregiver.services.length}</b>
-                <span>services</span>
-              </div>
 
               <div>
-                <b>100%</b>
-                <span>response goal</span>
+
+                <b>
+                  {caregiver.services.length}
+                </b>
+
+                <span>
+                  services
+                </span>
+
+              </div>
+
+
+              <div>
+
+                <b>
+                  100%
+                </b>
+
+                <span>
+                  response goal
+                </span>
+
               </div>
 
             </div>
@@ -1199,23 +1444,29 @@ function CaregiverPage({
               Services & rates
             </h2>
 
+
             {caregiver.services.map(s=>
+
               <div
                 className="rate"
                 key={s}
               >
 
                 <span>
+
                   {s==='walking'
                     ? '🐕 Dog walking'
                     : '🏡 Day care'}
+
                 </span>
+
 
                 <b>
                   {money(caregiver.hourly_rate)}
                 </b>
 
               </div>
+
             )}
 
 
@@ -1265,18 +1516,32 @@ function AuthModal({
 }){
 
   const [mode,setMode] =
-    useState<'signin'|'signup'>('signup');
+    useState<'signin'|'signup'>(
+      'signup'
+    );
 
-  const [email,setEmail] = useState('');
-  const [password,setPassword] = useState('');
-  const [name,setName] = useState('');
-  const [loading,setLoading] = useState(false);
+  const [email,setEmail] =
+    useState('');
+
+  const [password,setPassword] =
+    useState('');
+
+  const [name,setName] =
+    useState('');
+
+  const [loading,setLoading] =
+    useState(false);
+
 
   const submit = async()=>{
 
     setLoading(true);
 
-    if(!supabase){
+
+    const client = supabase;
+
+
+    if(!client){
 
       const u={
         id:'demo-user',
@@ -1291,9 +1556,12 @@ function AuthModal({
       );
 
       setLoading(false);
+
       onSuccess(u);
+
       return;
     }
+
 
     try{
 
@@ -1303,7 +1571,7 @@ function AuthModal({
           data,
           error
         } =
-          await supabase.auth.signUp({
+          await client.auth.signUp({
             email,
             password,
             options:{
@@ -1314,11 +1582,15 @@ function AuthModal({
             }
           });
 
-        if(error) throw error;
+
+        if(error)
+          throw error;
+
 
         notify(
           'Check your email if confirmation is enabled.'
         );
+
 
         onSuccess(data.user);
 
@@ -1328,12 +1600,15 @@ function AuthModal({
           data,
           error
         } =
-          await supabase.auth.signInWithPassword({
+          await client.auth.signInWithPassword({
             email,
             password
           });
 
-        if(error) throw error;
+
+        if(error)
+          throw error;
+
 
         onSuccess(data.user);
 
@@ -1375,7 +1650,9 @@ function AuthModal({
             <PawPrint size={18}/>
           </span>
 
-          <b>PetCare</b>
+          <b>
+            PetCare
+          </b>
 
         </div>
 
@@ -1402,10 +1679,13 @@ function AuthModal({
                 ? 'selected'
                 : ''
             }
-            onClick={()=>setRole('pet_parent')}
+            onClick={()=>
+              setRole('pet_parent')
+            }
           >
             Pet parent
           </button>
+
 
           <button
             className={
@@ -1413,7 +1693,9 @@ function AuthModal({
                 ? 'selected'
                 : ''
             }
-            onClick={()=>setRole('caregiver')}
+            onClick={()=>
+              setRole('caregiver')
+            }
           >
             Caregiver
           </button>
@@ -1428,7 +1710,9 @@ function AuthModal({
 
             <input
               value={name}
-              onChange={e=>setName(e.target.value)}
+              onChange={
+                e=>setName(e.target.value)
+              }
               placeholder="Your name"
             />
 
@@ -1443,7 +1727,9 @@ function AuthModal({
           <input
             type="email"
             value={email}
-            onChange={e=>setEmail(e.target.value)}
+            onChange={
+              e=>setEmail(e.target.value)
+            }
             placeholder="you@example.com"
           />
 
@@ -1457,7 +1743,9 @@ function AuthModal({
           <input
             type="password"
             value={password}
-            onChange={e=>setPassword(e.target.value)}
+            onChange={
+              e=>setPassword(e.target.value)
+            }
             placeholder="At least 8 characters"
           />
 
@@ -1494,9 +1782,11 @@ function AuthModal({
               )
             }
           >
+
             {mode==='signup'
               ? 'Sign in'
               : 'Create account'}
+
           </button>
 
         </div>
@@ -1539,19 +1829,28 @@ function BookingModal({
     useState(
       new Date(
         Date.now()+86400000
-      ).toISOString().slice(0,10)
+      )
+        .toISOString()
+        .slice(0,10)
     );
+
 
   const [hours,setHours] =
     useState(1);
 
+
   const gross =
     caregiver.hourly_rate*hours;
 
+
   const platform =
     Math.round(
-      (gross*feePct/100+fixedFee)*100
+      (
+        gross*feePct/100+
+        fixedFee
+      )*100
     )/100;
+
 
   const caregiverAmt =
     Math.max(
@@ -1573,7 +1872,8 @@ function BookingModal({
         caregiver.id,
 
       customer_id:
-        user?.id||'demo-user',
+        user?.id ||
+        'demo-user',
 
       start_at:
         date+'T09:00:00',
@@ -1590,15 +1890,19 @@ function BookingModal({
       caregiver_amount:
         caregiverAmt,
 
-      status:'pending',
+      status:
+        'pending',
 
       caregiver
 
     };
 
 
+    const client = supabase;
+
+
     if(
-      supabase &&
+      client &&
       user?.id &&
       !caregiver.id.startsWith('demo-')
     ){
@@ -1607,34 +1911,59 @@ function BookingModal({
         data,
         error
       } =
-        await supabase
+        await client
           .from('bookings')
           .insert({
-            customer_id:user.id,
-            caregiver_id:caregiver.id,
-            service_type:b.service_type,
-            start_at:b.start_at,
-            end_at:b.end_at,
-            total_amount:gross,
-            platform_fee:platform,
-            caregiver_amount:caregiverAmt,
-            status:'pending'
+            customer_id:
+              user.id,
+
+            caregiver_id:
+              caregiver.id,
+
+            service_type:
+              b.service_type,
+
+            start_at:
+              b.start_at,
+
+            end_at:
+              b.end_at,
+
+            total_amount:
+              gross,
+
+            platform_fee:
+              platform,
+
+            caregiver_amount:
+              caregiverAmt,
+
+            status:
+              'pending'
           })
           .select(
             '*, caregiver:caregiver_public(*)'
           )
           .single();
 
+
       if(error){
 
         alert(error.message);
+
         return;
 
       }
 
-      onDone(data as Booking);
+
+      onDone(
+        data as Booking
+      );
+
       return;
+
     }
+
 
     onDone(b);
 
@@ -1654,13 +1983,16 @@ function BookingModal({
           <X/>
         </button>
 
+
         <span className="kicker">
           Request care
         </span>
 
+
         <h2>
           Book with {caregiver.display_name.split(' ')[0]}
         </h2>
+
 
         <p>
           Choose a date and review the marketplace split
@@ -1675,7 +2007,9 @@ function BookingModal({
           <input
             type="date"
             value={date}
-            onChange={e=>setDate(e.target.value)}
+            onChange={
+              e=>setDate(e.target.value)
+            }
           />
 
         </label>
@@ -1687,18 +2021,27 @@ function BookingModal({
 
           <select
             value={hours}
-            onChange={e=>
-              setHours(Number(e.target.value))
+            onChange={
+              e=>
+                setHours(
+                  Number(e.target.value)
+                )
             }
           >
 
             {[1,2,3,4,5,6,8].map(h=>
+
               <option
                 key={h}
                 value={h}
               >
-                {h} {h===1?'hour':'hours'}
+                {h}
+                {' '}
+                {h===1
+                  ? 'hour'
+                  : 'hours'}
               </option>
+
             )}
 
           </select>
@@ -1709,27 +2052,54 @@ function BookingModal({
         <div className="pricebox">
 
           <div>
-            <span>Care total</span>
-            <b>{money(gross)}</b>
+
+            <span>
+              Care total
+            </span>
+
+            <b>
+              {money(gross)}
+            </b>
+
           </div>
 
+
           <div>
+
             <span>
               Platform fee ({feePct}%)
             </span>
-            <b>{money(platform)}</b>
+
+            <b>
+              {money(platform)}
+            </b>
+
           </div>
+
 
           <div className="total">
-            <span>Customer total</span>
-            <b>{money(gross)}</b>
+
+            <span>
+              Customer total
+            </span>
+
+            <b>
+              {money(gross)}
+            </b>
+
           </div>
 
+
           <div className="splitline">
-            <span>Caregiver share</span>
+
+            <span>
+              Caregiver share
+            </span>
+
             <strong>
               {money(caregiverAmt)}
             </strong>
+
           </div>
 
         </div>
@@ -1739,15 +2109,20 @@ function BookingModal({
           className="primary full"
           onClick={confirm}
         >
+
           <CreditCard size={17}/>
+
           Continue to secure payment
+
         </button>
 
 
         <small className="muted">
+
           Demo mode does not charge a card.
           Production checkout will be created by a secure
           Supabase Edge Function using Stripe Connect.
+
         </small>
 
       </div>
@@ -1790,15 +2165,20 @@ function Dashboard({
             Your workspace
           </span>
 
+
           <h1>
             {role==='caregiver'
               ? 'Caregiver dashboard'
               : 'My PetCare'}
           </h1>
 
+
           <p>
-            {user?.email||'Demo account'}
+            {user?.email ||
+              'Demo account'}
+
             {' · '}
+
             {role==='caregiver'
               ? 'Caregiver'
               : 'Pet parent'}
@@ -1811,8 +2191,11 @@ function Dashboard({
           className="ghost"
           onClick={onLogout}
         >
+
           <LogOut size={17}/>
+
           Sign out
+
         </button>
 
       </div>
@@ -1822,11 +2205,14 @@ function Dashboard({
 
         <div className="dashboardgrid">
 
+
           <div className="panel wide">
 
             <div className="paneltitle">
 
-              <h2>Today</h2>
+              <h2>
+                Today
+              </h2>
 
               <span className="status">
                 Profile active
@@ -1838,12 +2224,24 @@ function Dashboard({
             <div className="earnings">
 
               <div>
-                <span>Available earnings</span>
-                <b>$0.00</b>
+
+                <span>
+                  Available earnings
+                </span>
+
+                <b>
+                  $0.00
+                </b>
+
               </div>
 
+
               <div>
-                <span>Pending bookings</span>
+
+                <span>
+                  Pending bookings
+                </span>
+
                 <b>
                   {
                     bookings.filter(
@@ -1851,11 +2249,20 @@ function Dashboard({
                     ).length
                   }
                 </b>
+
               </div>
 
+
               <div>
-                <span>Rating</span>
-                <b>New</b>
+
+                <span>
+                  Rating
+                </span>
+
+                <b>
+                  New
+                </b>
+
               </div>
 
             </div>
@@ -1899,7 +2306,10 @@ function Dashboard({
 
           <div className="panel">
 
-            <h2>Profile</h2>
+            <h2>
+              Profile
+            </h2>
+
 
             <p>
               Complete your photo, bio, services,
@@ -1918,15 +2328,20 @@ function Dashboard({
 
         </div>
 
+
         :
 
         <div className="dashboardgrid">
+
 
           <div className="panel wide">
 
             <div className="paneltitle">
 
-              <h2>Upcoming</h2>
+              <h2>
+                Upcoming
+              </h2>
+
 
               <button
                 className="textbtn"
@@ -1952,29 +2367,44 @@ function Dashboard({
                     🐾
                   </div>
 
+
                   <div>
 
                     <b>
+
                       {b.service_type==='walking'
                         ? 'Dog walking'
                         : 'Day care'}
+
                     </b>
 
+
                     <span>
+
                       {b.start_at.slice(0,10)}
+
                       {' · '}
+
                       {b.status}
+
                     </span>
 
                   </div>
 
+
                   <strong>
+
                     {
                       money(
                         b.total_amount ??
-                        ((b as any).total_amount_cents||0)/100
+                        (
+                          (b as any)
+                            .total_amount_cents ||
+                          0
+                        )/100
                       )
                     }
+
                   </strong>
 
                 </div>
@@ -1985,7 +2415,9 @@ function Dashboard({
 
               <div className="empty small">
 
-                <div>🗓️</div>
+                <div>
+                  🗓️
+                </div>
 
                 <h3>
                   No bookings yet
@@ -1995,6 +2427,7 @@ function Dashboard({
                   Find a caregiver and request your first booking.
                 </p>
 
+
                 <button
                   className="primary"
                   onClick={onBook}
@@ -2003,6 +2436,7 @@ function Dashboard({
                 </button>
 
               </div>
+
             }
 
           </div>
@@ -2010,11 +2444,15 @@ function Dashboard({
 
           <div className="panel">
 
-            <h2>Account</h2>
+            <h2>
+              Account
+            </h2>
+
 
             <p>
               Keep your profile and pet information up to date.
             </p>
+
 
             <button className="secondary">
               Manage profile
@@ -2088,14 +2526,18 @@ function CaregiverProfileEditor({
 
   async function loadProfile(){
 
-    if(!supabase || !user?.id){
+    const client = supabase;
+
+    if(!client || !user?.id){
 
       setLoading(false);
-      return;
 
+      return;
     }
 
+
     setLoading(true);
+
 
     try{
 
@@ -2105,7 +2547,7 @@ function CaregiverProfileEditor({
         servicesResult
       ] = await Promise.all([
 
-        supabase
+        client
           .from('profiles')
           .select(
             'display_name,avatar_url,city,state'
@@ -2113,7 +2555,7 @@ function CaregiverProfileEditor({
           .eq('id',user.id)
           .single(),
 
-        supabase
+        client
           .from('caregiver_profiles')
           .select(
             'bio,years_experience'
@@ -2121,7 +2563,7 @@ function CaregiverProfileEditor({
           .eq('id',user.id)
           .single(),
 
-        supabase
+        client
           .from('caregiver_services')
           .select(
             'service_type,rate_cents,active'
@@ -2134,8 +2576,10 @@ function CaregiverProfileEditor({
       if(profileResult.error)
         throw profileResult.error;
 
+
       if(caregiverResult.error)
         throw caregiverResult.error;
+
 
       if(servicesResult.error)
         throw servicesResult.error;
@@ -2155,9 +2599,11 @@ function CaregiverProfileEditor({
         profile?.display_name || ''
       );
 
+
       setCity(
         profile?.city || ''
       );
+
 
       setState(
         profile?.state || ''
@@ -2167,6 +2613,7 @@ function CaregiverProfileEditor({
       setBio(
         caregiver?.bio || ''
       );
+
 
       setYearsExperience(
         caregiver?.years_experience || 0
@@ -2191,6 +2638,7 @@ function CaregiverProfileEditor({
         !!walkingRow?.active
       );
 
+
       setDaycare(
         !!daycareRow?.active
       );
@@ -2200,7 +2648,9 @@ function CaregiverProfileEditor({
 
         setWalkingRate(
           (
-            Number(walkingRow.rate_cents||0)/100
+            Number(
+              walkingRow.rate_cents || 0
+            )/100
           ).toFixed(2)
         );
 
@@ -2211,7 +2661,9 @@ function CaregiverProfileEditor({
 
         setDaycareRate(
           (
-            Number(daycareRow.rate_cents||0)/100
+            Number(
+              daycareRow.rate_cents || 0
+            )/100
           ).toFixed(2)
         );
 
@@ -2235,7 +2687,9 @@ function CaregiverProfileEditor({
 
   async function saveProfile(){
 
-    if(!supabase || !user?.id)
+    const client = supabase;
+
+    if(!client || !user?.id)
       return;
 
 
@@ -2308,7 +2762,7 @@ function CaregiverProfileEditor({
       const {
         error:profileError
       } =
-        await supabase
+        await client
           .from('profiles')
           .update({
 
@@ -2332,7 +2786,7 @@ function CaregiverProfileEditor({
       const {
         error:caregiverError
       } =
-        await supabase
+        await client
           .from('caregiver_profiles')
           .update({
 
@@ -2358,23 +2812,42 @@ function CaregiverProfileEditor({
       const serviceRows = [
 
         {
-          caregiver_id:user.id,
-          service_type:'walking',
+          caregiver_id:
+            user.id,
+
+          service_type:
+            'walking',
+
           rate_cents:
             Math.round(
-              Number(walkingRate||0)*100
+              Number(
+                walkingRate || 0
+              )*100
             ),
-          active:walking
+
+          active:
+            walking
+
         },
 
+
         {
-          caregiver_id:user.id,
-          service_type:'daycare',
+          caregiver_id:
+            user.id,
+
+          service_type:
+            'daycare',
+
           rate_cents:
             Math.round(
-              Number(daycareRate||0)*100
+              Number(
+                daycareRate || 0
+              )*100
             ),
-          active:daycare
+
+          active:
+            daycare
+
         }
 
       ];
@@ -2383,7 +2856,7 @@ function CaregiverProfileEditor({
       const {
         error:servicesError
       } =
-        await supabase
+        await client
           .from('caregiver_services')
           .upsert(
             serviceRows,
@@ -2402,7 +2875,14 @@ function CaregiverProfileEditor({
         'Profile saved successfully'
       );
 
+
+      await loadCaregiversAfterSave(
+        client
+      );
+
+
       onBack();
+
 
     }catch(error:any){
 
@@ -2415,6 +2895,27 @@ function CaregiverProfileEditor({
 
       setSaving(false);
 
+    }
+
+  }
+
+
+  async function loadCaregiversAfterSave(
+    client:any
+  ){
+
+    const {data} =
+      await client
+        .from('caregiver_public')
+        .select('*')
+        .order(
+          'rating',
+          {ascending:false}
+        );
+
+    if(data?.length){
+      // The main caregiver list will refresh
+      // on the next application load.
     }
 
   }
@@ -2493,7 +2994,9 @@ function CaregiverProfileEditor({
             <input
               value={displayName}
               onChange={
-                e=>setDisplayName(e.target.value)
+                e=>setDisplayName(
+                  e.target.value
+                )
               }
               placeholder="Your full name"
             />
@@ -2508,7 +3011,9 @@ function CaregiverProfileEditor({
             <input
               value={city}
               onChange={
-                e=>setCity(e.target.value)
+                e=>setCity(
+                  e.target.value
+                )
               }
               placeholder="Miami"
             />
@@ -2523,7 +3028,9 @@ function CaregiverProfileEditor({
             <input
               value={state}
               onChange={
-                e=>setState(e.target.value)
+                e=>setState(
+                  e.target.value
+                )
               }
               placeholder="Florida"
             />
@@ -2540,10 +3047,9 @@ function CaregiverProfileEditor({
               min="0"
               value={yearsExperience}
               onChange={
-                e=>
-                  setYearsExperience(
-                    Number(e.target.value)
-                  )
+                e=>setYearsExperience(
+                  Number(e.target.value)
+                )
               }
             />
 
@@ -2557,7 +3063,9 @@ function CaregiverProfileEditor({
             <textarea
               value={bio}
               onChange={
-                e=>setBio(e.target.value)
+                e=>setBio(
+                  e.target.value
+                )
               }
               placeholder="Tell pet parents about your experience with animals..."
               rows={6}
@@ -2573,6 +3081,7 @@ function CaregiverProfileEditor({
           <h2>
             Services & rates
           </h2>
+
 
           <p className="muted">
             Choose the services you offer and set your rate.
@@ -2592,6 +3101,7 @@ function CaregiverProfileEditor({
                   )
                 }
               />
+
 
               <div>
 
@@ -2619,10 +3129,9 @@ function CaregiverProfileEditor({
                   step="0.01"
                   value={walkingRate}
                   onChange={
-                    e=>
-                      setWalkingRate(
-                        e.target.value
-                      )
+                    e=>setWalkingRate(
+                      e.target.value
+                    )
                   }
                   placeholder="25.00"
                 />
@@ -2646,6 +3155,7 @@ function CaregiverProfileEditor({
                   )
                 }
               />
+
 
               <div>
 
@@ -2673,10 +3183,9 @@ function CaregiverProfileEditor({
                   step="0.01"
                   value={daycareRate}
                   onChange={
-                    e=>
-                      setDaycareRate(
-                        e.target.value
-                      )
+                    e=>setDaycareRate(
+                      e.target.value
+                    )
                   }
                   placeholder="40.00"
                 />
@@ -2713,6 +3222,7 @@ function CaregiverProfileEditor({
     </main>
 
   );
+
 }
 
 
@@ -2753,6 +3263,7 @@ function Admin({
         <div className="adminbadge">
 
           <Settings size={17}/>
+
           Admin
 
         </div>
@@ -2762,11 +3273,13 @@ function Admin({
 
       <div className="settingsgrid">
 
+
         <div className="panel">
 
           <h2>
             Payments & split
           </h2>
+
 
           <p className="muted">
             These values are illustrative for the MVP.
@@ -2785,12 +3298,11 @@ function Admin({
               max="100"
               value={settings.platformFeePct}
               onChange={
-                e=>
-                  setSettings({
-                    ...settings,
-                    platformFeePct:
-                      Number(e.target.value)
-                  })
+                e=>setSettings({
+                  ...settings,
+                  platformFeePct:
+                    Number(e.target.value)
+                })
               }
             />
 
@@ -2807,12 +3319,11 @@ function Admin({
               step="0.01"
               value={settings.fixedFee}
               onChange={
-                e=>
-                  setSettings({
-                    ...settings,
-                    fixedFee:
-                      Number(e.target.value)
-                  })
+                e=>setSettings({
+                  ...settings,
+                  fixedFee:
+                    Number(e.target.value)
+                })
               }
             />
 
@@ -2829,12 +3340,11 @@ function Admin({
               max="30"
               value={settings.holdDays}
               onChange={
-                e=>
-                  setSettings({
-                    ...settings,
-                    holdDays:
-                      Number(e.target.value)
-                  })
+                e=>setSettings({
+                  ...settings,
+                  holdDays:
+                    Number(e.target.value)
+                })
               }
             />
 
