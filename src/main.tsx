@@ -2527,7 +2527,69 @@ function CaregiverProfileEditor({
 
   return (
 
-    <main className="container page">
+    <>
+
+      <style>{`
+        .caregiver-editor .profile-form-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 320px;
+          gap: 18px;
+          align-items: start;
+        }
+        .caregiver-editor .profile-field {
+          display: block;
+          width: 100%;
+          margin: 18px 0;
+        }
+        .caregiver-editor .profile-field input,
+        .caregiver-editor .profile-field textarea {
+          display: block;
+          width: 100%;
+          border: 1px solid var(--line);
+          padding: 12px;
+          border-radius: 10px;
+          margin-top: 7px;
+          background: #fff;
+          font: inherit;
+          color: var(--ink);
+        }
+        .caregiver-editor .profile-field textarea {
+          resize: vertical;
+        }
+        .caregiver-editor .service-choice {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 10px;
+          margin: 0;
+        }
+        .caregiver-editor .service-choice input {
+          width: 18px;
+          height: 18px;
+          flex: 0 0 18px;
+        }
+        .caregiver-editor .service-rate {
+          display: block;
+          margin: 0;
+        }
+        .caregiver-editor .service-rate input {
+          display: block;
+          width: 100%;
+          border: 1px solid var(--line);
+          padding: 12px;
+          border-radius: 10px;
+          margin-top: 7px;
+          background: #fff;
+          font: inherit;
+        }
+        @media (max-width: 900px) {
+          .caregiver-editor .profile-form-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
+    <main className="container page caregiver-editor">
 
       <button
         type="button"
@@ -2563,13 +2625,7 @@ function CaregiverProfileEditor({
         onSubmit={saveProfile}
       >
 
-        <div
-          style={{
-            display:'grid',
-            gridTemplateColumns:'minmax(0,1fr) 320px',
-            gap:'18px'
-          }}
-        >
+        <div className="profile-form-grid">
 
           <div className="panel">
 
@@ -2577,7 +2633,7 @@ function CaregiverProfileEditor({
               Basic information
             </h2>
 
-            <label>
+            <label className="profile-field">
               Full name
 
               <input
@@ -2593,7 +2649,7 @@ function CaregiverProfileEditor({
 
             </label>
 
-            <label>
+            <label className="profile-field">
               City
 
               <input
@@ -2606,7 +2662,7 @@ function CaregiverProfileEditor({
 
             </label>
 
-            <label>
+            <label className="profile-field">
               State
 
               <input
@@ -2619,7 +2675,7 @@ function CaregiverProfileEditor({
 
             </label>
 
-            <label>
+            <label className="profile-field">
               Years of experience
 
               <input
@@ -2635,7 +2691,7 @@ function CaregiverProfileEditor({
 
             </label>
 
-            <label>
+            <label className="profile-field">
               About you
 
               <textarea
@@ -2669,7 +2725,7 @@ function CaregiverProfileEditor({
               }}
             >
 
-              <label
+              <label className="service-choice"
                 style={{
                   display:'flex',
                   flexDirection:'row',
@@ -2708,7 +2764,7 @@ function CaregiverProfileEditor({
                 Walk and exercise dogs.
               </p>
 
-              <label>
+              <label className="service-rate">
                 Dog walking rate ($)
 
                 <input
@@ -2734,7 +2790,7 @@ function CaregiverProfileEditor({
               }}
             >
 
-              <label
+              <label className="service-choice"
                 style={{
                   display:'flex',
                   flexDirection:'row',
@@ -2773,7 +2829,7 @@ function CaregiverProfileEditor({
                 Provide daytime care for pets.
               </p>
 
-              <label>
+              <label className="service-rate">
                 Day care rate ($)
 
                 <input
@@ -2874,6 +2930,8 @@ function CaregiverProfileEditor({
       </form>
 
     </main>
+
+    </>
 
   );
 
