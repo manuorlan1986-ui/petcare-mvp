@@ -50,7 +50,7 @@ function App(){
   const [service,setService] =
     useState<ServiceType|'all'>('all');
 
-  const [city,setCity] = useState('');
+  const [city,setCity] = useState('Miami');
 
   const [caregivers,setCaregivers] =
     useState<Caregiver[]>([]);
@@ -212,8 +212,6 @@ function App(){
         return;
       }
 
-      // Supabase is the only source of truth for public caregivers.
-      // Never fall back to demo data in production.
       setCaregivers((data ?? []) as Caregiver[]);
 
     }catch(error){
@@ -228,13 +226,24 @@ function App(){
 
   const filtered = useMemo(()=>{
 
-    return caregivers.filter(c=>
-      (service==='all' || c.services.includes(service)) &&
-      (!city ||
-        (c.city ?? '')
-          .toLowerCase()
-          .includes(city.toLowerCase()))
-    );
+    const normalizedCity = city.trim().toLowerCase();
+
+    return caregivers.filter(c=>{
+
+      const matchesService =
+        service === 'all' ||
+        c.services.includes(service);
+
+      const caregiverCity =
+        (c.city ?? '').trim().toLowerCase();
+
+      const matchesCity =
+        !normalizedCity ||
+        caregiverCity.includes(normalizedCity);
+
+      return matchesService && matchesCity;
+
+    });
 
   },[caregivers,service,city]);
 
@@ -324,7 +333,7 @@ function App(){
               Become a caregiver
             </button>
 
-            {(role as string) === 'admin' && (
+            {user?.email?.includes('admin') && (
 
               <button
                 type="button"
@@ -535,7 +544,7 @@ function App(){
 
       )}
 
-      {view==='admin' && (role as string) === 'admin' && (
+      {view==='admin' && (
 
         <Admin
           settings={settings}
@@ -3271,21 +3280,17 @@ function Dashboard({
           </span>
 
           <h1>
-            {(role as string) === 'admin'
-              ? 'Admin dashboard'
-              : role==='caregiver'
-                ? 'Caregiver dashboard'
-                : 'My PetCare'}
+            {role==='caregiver'
+              ? 'Caregiver dashboard'
+              : 'My PetCare'}
           </h1>
 
           <p>
             {user?.email || 'Demo account'}
             {' · '}
-            {(role as string) === 'admin'
-              ? 'Administrator'
-              : role==='caregiver'
-                ? 'Caregiver'
-                : 'Pet parent'}
+            {role==='caregiver'
+              ? 'Caregiver'
+              : 'Pet parent'}
           </p>
 
         </div>
@@ -3559,164 +3564,6 @@ function Admin({
   onSave:()=>void
 }){
 
-  type AdminCaregiver = {
-    id:string;
-    display_name:string;
-    city:string;
-    state:string;
-    bio:string;
-    years_experience:number;
-    public_status:string;
-    rejection_reason:string;
-    reviewed_at:string|null;
-    services:Array<{
-      service_type:string;
-      rate_cents:number;
-      active:boolean;
-    }>;
-  };
-
-  const [caregivers,setCaregivers] =
-    useState<AdminCaregiver[]>([]);
-
-  const [statusFilter,setStatusFilter] =
-    useState('all');
-
-  const [loading,setLoading] =
-    useState(true);
-
-  const [error,setError] =
-    useState('');
-
-  async function loadAdminCaregivers(){
-
-    const client = supabase;
-
-    if(!client){
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try{
-
-      const [cp,profiles,servicesResult] =
-        await Promise.all([
-          client
-            .from('caregiver_profiles')
-            .select(
-              'id,bio,years_experience,public_status,rejection_reason,reviewed_at'
-            ),
-          client
-            .from('profiles')
-            .select('id,display_name,city,state')
-            .eq('role','caregiver'),
-          client
-            .from('caregiver_services')
-            .select('caregiver_id,service_type,rate_cents,active')
-        ]);
-
-      if(cp.error) throw cp.error;
-      if(profiles.error) throw profiles.error;
-      if(servicesResult.error) throw servicesResult.error;
-
-      const profileMap = new Map(
-        (profiles.data || []).map((p:any)=>[p.id,p])
-      );
-
-      const serviceMap = new Map<string,any[]>();
-
-      for(const row of servicesResult.data || []){
-        const list = serviceMap.get(row.caregiver_id) || [];
-        list.push(row);
-        serviceMap.set(row.caregiver_id,list);
-      }
-
-      const merged = (cp.data || []).map((row:any)=>{
-        const p:any = profileMap.get(row.id) || {};
-        return {
-          id:row.id,
-          display_name:p.display_name || 'Caregiver',
-          city:p.city || '',
-          state:p.state || '',
-          bio:row.bio || '',
-          years_experience:Number(row.years_experience || 0),
-          public_status:row.public_status || 'pending',
-          rejection_reason:row.rejection_reason || '',
-          reviewed_at:row.reviewed_at || null,
-          services:serviceMap.get(row.id) || []
-        };
-      });
-
-      setCaregivers(merged);
-
-    }catch(err:any){
-      console.error('Admin caregiver loading error:',err);
-      setError(err?.message || 'Could not load caregivers.');
-    }finally{
-      setLoading(false);
-    }
-  }
-
-  useEffect(()=>{
-    void loadAdminCaregivers();
-  },[]);
-
-  async function updateStatus(
-    caregiverId:string,
-    nextStatus:string
-  ){
-
-    const client = supabase;
-    if(!client) return;
-
-    let rejectionReason = '';
-
-    if(nextStatus==='rejected'){
-      rejectionReason =
-        window.prompt(
-          'Reason for rejection (optional):'
-        ) || '';
-    }
-
-    const {error:updateError} = await client
-      .from('caregiver_profiles')
-      .update({
-        public_status:nextStatus,
-        rejection_reason:
-          rejectionReason || null,
-        reviewed_at:new Date().toISOString()
-      })
-      .eq('id',caregiverId);
-
-    if(updateError){
-      setError(updateError.message);
-      return;
-    }
-
-    await loadAdminCaregivers();
-  }
-
-  const visibleCaregivers = caregivers.filter(c=>
-    statusFilter==='all' ||
-    c.public_status===statusFilter
-  );
-
-  const statusLabel = (status:string)=>({
-    pending:'Pending',
-    under_review:'Under review',
-    approved:'Approved',
-    rejected:'Rejected',
-    suspended:'Suspended'
-  } as Record<string,string>)[status] || status;
-
-  const serviceLabel = (type:string)=>
-    type==='walking' ? '🐕 Dog walking' :
-    type==='daycare' ? '🏠 Day care' :
-    type;
-
   return (
 
     <main className="container page">
@@ -3747,212 +3594,6 @@ function Admin({
 
       </div>
 
-      <div className="panel" style={{marginBottom:'24px'}}>
-
-        <div className="paneltitle">
-
-          <div>
-            <h2>Caregiver approvals</h2>
-            <p className="muted">
-              Review caregiver profiles before making them visible in Find Care.
-            </p>
-          </div>
-
-          <select
-            value={statusFilter}
-            onChange={e=>setStatusFilter(e.target.value)}
-            style={{maxWidth:'180px'}}
-          >
-            <option value="all">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="under_review">Under review</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="suspended">Suspended</option>
-          </select>
-
-        </div>
-
-        {loading && (
-          <p className="muted">Loading caregivers...</p>
-        )}
-
-        {error && (
-          <div style={{
-            marginTop:'12px',
-            padding:'12px',
-            border:'1px solid #f1b8b2',
-            borderRadius:'10px',
-            color:'#9f2d24',
-            background:'#fff7f6'
-          }}>
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && visibleCaregivers.length===0 && (
-          <p className="muted">
-            No caregivers found for this status.
-          </p>
-        )}
-
-        <div style={{display:'grid',gap:'14px'}}>
-
-          {visibleCaregivers.map(c=>(
-
-            <div
-              key={c.id}
-              className="panel"
-              style={{
-                padding:'18px',
-                border:'1px solid #dfe8e5'
-              }}
-            >
-
-              <div style={{
-                display:'flex',
-                justifyContent:'space-between',
-                gap:'16px',
-                alignItems:'flex-start',
-                flexWrap:'wrap'
-              }}>
-
-                <div>
-
-                  <div style={{
-                    display:'flex',
-                    alignItems:'center',
-                    gap:'8px',
-                    flexWrap:'wrap'
-                  }}>
-                    <h3 style={{margin:0}}>
-                      {c.display_name}
-                    </h3>
-
-                    <span className="status">
-                      {statusLabel(c.public_status)}
-                    </span>
-                  </div>
-
-                  <p style={{margin:'8px 0 0'}}>
-                    {c.city || 'City not set'}
-                    {c.state ? `, ${c.state}` : ''}
-                    {' · '}
-                    {c.years_experience} years experience
-                  </p>
-
-                  {c.bio ? (
-                    <p style={{margin:'8px 0 0'}}>
-                      {c.bio}
-                    </p>
-                  ) : (
-                    <p className="muted" style={{margin:'8px 0 0'}}>
-                      No caregiver bio provided yet.
-                    </p>
-                  )}
-
-                  {c.rejection_reason && (
-                    <p style={{margin:'8px 0 0',color:'#9f2d24'}}>
-                      Rejection reason: {c.rejection_reason}
-                    </p>
-                  )}
-
-                  <div style={{
-                    display:'flex',
-                    flexWrap:'wrap',
-                    gap:'8px',
-                    marginTop:'10px'
-                  }}>
-                    {c.services.filter(s=>s.active).map(s=>(
-                      <span
-                        key={`${c.id}-${s.service_type}`}
-                        className="chip"
-                      >
-                        {serviceLabel(s.service_type)} · {money(s.rate_cents/100)}
-                      </span>
-                    ))}
-                  </div>
-
-                </div>
-
-                <div style={{
-                  display:'flex',
-                  gap:'8px',
-                  flexWrap:'wrap'
-                }}>
-
-                  {c.public_status==='pending' && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={()=>void updateStatus(c.id,'under_review')}
-                    >
-                      Review
-                    </button>
-                  )}
-
-                  {c.public_status==='under_review' && (
-                    <button
-                      type="button"
-                      className="primary"
-                      onClick={()=>void updateStatus(c.id,'approved')}
-                    >
-                      Approve
-                    </button>
-                  )}
-
-                  {(c.public_status==='pending' || c.public_status==='under_review' || c.public_status==='approved') && (
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={()=>void updateStatus(c.id,'rejected')}
-                    >
-                      Reject
-                    </button>
-                  )}
-
-                  {c.public_status==='approved' && (
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={()=>void updateStatus(c.id,'suspended')}
-                    >
-                      Suspend
-                    </button>
-                  )}
-
-                  {c.public_status==='suspended' && (
-                    <button
-                      type="button"
-                      className="primary"
-                      onClick={()=>void updateStatus(c.id,'approved')}
-                    >
-                      Reactivate
-                    </button>
-                  )}
-
-                  {c.public_status==='rejected' && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={()=>void updateStatus(c.id,'under_review')}
-                    >
-                      Review again
-                    </button>
-                  )}
-
-                </div>
-
-              </div>
-
-            </div>
-
-          ))}
-
-        </div>
-
-      </div>
-
       <div className="settingsgrid">
 
         <div className="panel">
@@ -3967,45 +3608,69 @@ function Admin({
           </p>
 
           <label>
+
             Platform commission (%)
+
             <input
               type="number"
               min="0"
               max="100"
-              value={settings.platformFeePct}
-              onChange={e=>setSettings({
-                ...settings,
-                platformFeePct:Number(e.target.value)
-              })}
+              value={
+                settings.platformFeePct
+              }
+              onChange={e=>
+                setSettings({
+                  ...settings,
+                  platformFeePct:
+                    Number(e.target.value)
+                })
+              }
             />
+
           </label>
 
           <label>
+
             Fixed platform fee ($)
+
             <input
               type="number"
               min="0"
               step="0.01"
-              value={settings.fixedFee}
-              onChange={e=>setSettings({
-                ...settings,
-                fixedFee:Number(e.target.value)
-              })}
+              value={
+                settings.fixedFee
+              }
+              onChange={e=>
+                setSettings({
+                  ...settings,
+                  fixedFee:
+                    Number(e.target.value)
+                })
+              }
             />
+
           </label>
 
           <label>
+
             Payout hold (days)
+
             <input
               type="number"
               min="0"
               max="30"
-              value={settings.holdDays}
-              onChange={e=>setSettings({
-                ...settings,
-                holdDays:Number(e.target.value)
-              })}
+              value={
+                settings.holdDays
+              }
+              onChange={e=>
+                setSettings({
+                  ...settings,
+                  holdDays:
+                    Number(e.target.value)
+                })
+              }
             />
+
           </label>
 
           <button
@@ -4020,38 +3685,84 @@ function Admin({
 
         <div className="panel">
 
-          <h2>Security checklist</h2>
+          <h2>
+            Security checklist
+          </h2>
 
           <div className="check">
+
             <CheckCircle2/>
+
             <div>
-              <b>RLS enabled</b>
-              <span>Database policies protect customer/caregiver data.</span>
+
+              <b>
+                RLS enabled
+              </b>
+
+              <span>
+                Database policies protect
+                customer/caregiver data.
+              </span>
+
             </div>
+
           </div>
 
           <div className="check">
+
             <CheckCircle2/>
+
             <div>
-              <b>Secret keys server-side</b>
-              <span>Stripe secret and service-role keys never ship to Netlify.</span>
+
+              <b>
+                Secret keys server-side
+              </b>
+
+              <span>
+                Stripe secret and service-role
+                keys never ship to Netlify.
+              </span>
+
             </div>
+
           </div>
 
           <div className="check">
+
             <CheckCircle2/>
+
             <div>
-              <b>Webhook verification</b>
-              <span>Stripe webhooks are verified inside the Edge Function.</span>
+
+              <b>
+                Webhook verification
+              </b>
+
+              <span>
+                Stripe webhooks are verified
+                inside the Edge Function.
+              </span>
+
             </div>
+
           </div>
 
           <div className="check">
+
             <Sparkles/>
+
             <div>
-              <b>Auditable fee rules</b>
-              <span>Each booking stores the fee snapshot used at checkout.</span>
+
+              <b>
+                Auditable fee rules
+              </b>
+
+              <span>
+                Each booking stores the fee
+                snapshot used at checkout.
+              </span>
+
             </div>
+
           </div>
 
         </div>
