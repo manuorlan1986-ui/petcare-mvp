@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {supabase} from './supabase';
-import {services} from './data';
+import {demoCaregivers, services} from './data';
 import type {Booking, Caregiver, Role, ServiceType} from './types';
 import {
   Search,
@@ -212,7 +212,9 @@ function App(){
         return;
       }
 
-      setCaregivers((data ?? []) as Caregiver[]);
+      if(data?.length){
+        setCaregivers(data as Caregiver[]);
+      }
 
     }catch(error){
 
@@ -226,24 +228,13 @@ function App(){
 
   const filtered = useMemo(()=>{
 
-    const normalizedCity = city.trim().toLowerCase();
-
-    return caregivers.filter(c=>{
-
-      const matchesService =
-        service === 'all' ||
-        c.services.includes(service);
-
-      const caregiverCity =
-        (c.city ?? '').trim().toLowerCase();
-
-      const matchesCity =
-        !normalizedCity ||
-        caregiverCity.includes(normalizedCity);
-
-      return matchesService && matchesCity;
-
-    });
+    return caregivers.filter(c=>
+      (service==='all' || c.services.includes(service)) &&
+      (!city ||
+        c.city
+          .toLowerCase()
+          .includes(city.toLowerCase()))
+    );
 
   },[caregivers,service,city]);
 
@@ -333,7 +324,7 @@ function App(){
               Become a caregiver
             </button>
 
-            {user?.email?.includes('admin') && (
+            {role === 'admin' && user && (
 
               <button
                 type="button"
