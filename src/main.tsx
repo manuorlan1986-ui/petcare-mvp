@@ -232,9 +232,9 @@ function App(){
   const filtered = useMemo(()=>{
 
     return caregivers.filter(c=>
-      (service==='all' || c.services.includes(service)) &&
+      (service==='all' || (c.services ?? []).includes(service)) &&
       (!city ||
-        c.city
+        (c.city ?? '')
           .toLowerCase()
           .includes(city.toLowerCase()))
     );
@@ -327,7 +327,7 @@ function App(){
               Become a caregiver
             </button>
 
-            {user?.email?.includes('admin') && (
+            {role === 'admin' && (
 
               <button
                 type="button"
