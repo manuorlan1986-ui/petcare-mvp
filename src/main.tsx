@@ -212,9 +212,12 @@ function App(){
         return;
       }
 
-      if(data?.length){
-        setCaregivers(data as Caregiver[]);
-      }
+      /*
+       * Supabase is authoritative when configured.
+       * If there are no approved caregivers, keep the
+       * public search empty instead of showing demo data.
+       */
+      setCaregivers((data || []) as Caregiver[]);
 
     }catch(error){
 
@@ -324,7 +327,7 @@ function App(){
               Become a caregiver
             </button>
 
-            {(role as string) === 'admin' && (
+            {role==='admin' && (
 
               <button
                 type="button"
@@ -535,7 +538,7 @@ function App(){
 
       )}
 
-      {view==='admin' && (role as string) === 'admin' && (
+      {view==='admin' && role==='admin' && (
 
         <Admin
           settings={settings}
@@ -3271,21 +3274,17 @@ function Dashboard({
           </span>
 
           <h1>
-            {(role as string) === 'admin'
-              ? 'Admin dashboard'
-              : role==='caregiver'
-                ? 'Caregiver dashboard'
-                : 'My PetCare'}
+            {role==='caregiver'
+              ? 'Caregiver dashboard'
+              : 'My PetCare'}
           </h1>
 
           <p>
             {user?.email || 'Demo account'}
             {' · '}
-            {(role as string) === 'admin'
-              ? 'Administrator'
-              : role==='caregiver'
-                ? 'Caregiver'
-                : 'Pet parent'}
+            {role==='caregiver'
+              ? 'Caregiver'
+              : 'Pet parent'}
           </p>
 
         </div>
@@ -3549,6 +3548,19 @@ function Dashboard({
    ADMIN
 ========================================================= */
 
+type AdminCaregiver = {
+  id:string;
+  display_name:string;
+  city:string;
+  state:string;
+  bio:string;
+  years_experience:number;
+  public_status:'pending'|'under_review'|'approved'|'rejected'|'suspended'|string;
+  rejection_reason:string|null;
+  reviewed_at:string|null;
+  services:Array<{service_type:string;rate_cents:number;active:boolean}>;
+};
+
 function Admin({
   settings,
   setSettings,
@@ -3558,6 +3570,203 @@ function Admin({
   setSettings:(s:any)=>void;
   onSave:()=>void
 }){
+
+  const [caregivers,setCaregivers] =
+    useState<AdminCaregiver[]>([]);
+
+  const [loadingCaregivers,setLoadingCaregivers] =
+    useState(true);
+
+  const [actionId,setActionId] =
+    useState<string|null>(null);
+
+  const [adminError,setAdminError] =
+    useState('');
+
+  const [filter,setFilter] =
+    useState('all');
+
+  async function loadAdminCaregivers(){
+
+    const client = supabase;
+
+    if(!client){
+      setLoadingCaregivers(false);
+      return;
+    }
+
+    setAdminError('');
+
+    try{
+
+      const {data:caregiverRows,error:caregiverError} =
+        await client
+          .from('caregiver_profiles')
+          .select('id,bio,years_experience,public_status,rejection_reason,reviewed_at')
+          .order('public_status',{ascending:true});
+
+      if(caregiverError) throw caregiverError;
+
+      const ids = (caregiverRows || []).map((row:any)=>row.id);
+
+      if(!ids.length){
+        setCaregivers([]);
+        return;
+      }
+
+      const [profilesResult,servicesResult] = await Promise.all([
+
+        client
+          .from('profiles')
+          .select('id,display_name,city,state,role')
+          .in('id',ids),
+
+        client
+          .from('caregiver_services')
+          .select('caregiver_id,service_type,rate_cents,active')
+          .in('caregiver_id',ids)
+
+      ]);
+
+      if(profilesResult.error) throw profilesResult.error;
+      if(servicesResult.error) throw servicesResult.error;
+
+      const profileMap = new Map(
+        (profilesResult.data || []).map((row:any)=>[row.id,row])
+      );
+
+      const serviceMap = new Map<string,AdminCaregiver['services']>();
+
+      for(const row of servicesResult.data || []){
+        const current = serviceMap.get(row.caregiver_id) || [];
+        current.push({
+          service_type:row.service_type,
+          rate_cents:Number(row.rate_cents || 0),
+          active:Boolean(row.active)
+        });
+        serviceMap.set(row.caregiver_id,current);
+      }
+
+      const merged:AdminCaregiver[] = (caregiverRows || []).map((row:any)=>{
+        const profile:any = profileMap.get(row.id) || {};
+        return {
+          id:row.id,
+          display_name:profile.display_name || 'Unnamed caregiver',
+          city:profile.city || '',
+          state:profile.state || '',
+          bio:row.bio || '',
+          years_experience:Number(row.years_experience || 0),
+          public_status:row.public_status || 'pending',
+          rejection_reason:row.rejection_reason || null,
+          reviewed_at:row.reviewed_at || null,
+          services:serviceMap.get(row.id) || []
+        };
+      });
+
+      setCaregivers(merged);
+
+    }catch(error:any){
+
+      console.error('Admin caregiver load error:',error);
+
+      setAdminError(
+        error?.message ||
+        'Could not load caregivers for administration.'
+      );
+
+    }finally{
+      setLoadingCaregivers(false);
+    }
+  }
+
+  useEffect(()=>{
+    void loadAdminCaregivers();
+  },[]);
+
+  async function changeStatus(
+    caregiverId:string,
+    status:AdminCaregiver['public_status']
+  ){
+
+    const client = supabase;
+
+    if(!client) return;
+
+    setActionId(caregiverId);
+    setAdminError('');
+
+    try{
+
+      const rejectionReason =
+        status==='rejected'
+          ? window.prompt(
+              'Optional reason for rejection:'
+            )
+          : null;
+
+      const {error} = await client
+        .from('caregiver_profiles')
+        .update({
+          public_status:status,
+          reviewed_at:new Date().toISOString(),
+          rejection_reason:
+            status==='rejected'
+              ? (rejectionReason?.trim() || null)
+              : null
+        })
+        .eq('id',caregiverId);
+
+      if(error) throw error;
+
+      await loadAdminCaregivers();
+
+    }catch(error:any){
+
+      console.error('Admin caregiver status error:',error);
+
+      setAdminError(
+        error?.message ||
+        'Could not update caregiver status.'
+      );
+
+    }finally{
+      setActionId(null);
+    }
+  }
+
+  const visibleCaregivers =
+    filter==='all'
+      ? caregivers
+      : caregivers.filter(x=>x.public_status===filter);
+
+  const statusLabel = (status:string) => {
+    switch(status){
+      case 'under_review': return 'Under review';
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
+      case 'suspended': return 'Suspended';
+      default: return 'Pending';
+    }
+  };
+
+  const statusStyle = (status:string) => ({
+    display:'inline-flex',
+    alignItems:'center',
+    padding:'6px 9px',
+    borderRadius:'999px',
+    fontSize:'12px',
+    fontWeight:700,
+    background:
+      status==='approved' ? '#ecfdf3' :
+      status==='rejected' ? '#fff1f0' :
+      status==='suspended' ? '#f3f4f6' :
+      status==='under_review' ? '#eff6ff' : '#fff8e1',
+    color:
+      status==='approved' ? '#16794a' :
+      status==='rejected' ? '#9f2d24' :
+      status==='suspended' ? '#475467' :
+      status==='under_review' ? '#1d4ed8' : '#8a5b00'
+  });
 
   return (
 
@@ -3586,6 +3795,122 @@ function Admin({
           <Settings size={17}/>
           Admin
         </div>
+
+      </div>
+
+      <div className="panel" style={{marginBottom:'22px'}}>
+
+        <div className="paneltitle" style={{alignItems:'flex-start',gap:'16px',flexWrap:'wrap'}}>
+
+          <div>
+            <h2 style={{marginBottom:'4px'}}>Caregiver approvals</h2>
+            <p className="muted" style={{margin:0}}>
+              Review caregiver profiles before making them visible in Find Care.
+            </p>
+          </div>
+
+          <select
+            value={filter}
+            onChange={e=>setFilter(e.target.value)}
+            style={{maxWidth:'180px'}}
+          >
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="under_review">Under review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="suspended">Suspended</option>
+          </select>
+
+        </div>
+
+        {adminError && (
+          <div style={{marginTop:'14px',padding:'12px 14px',borderRadius:'10px',background:'#fff1f0',border:'1px solid #f1b8b2',color:'#9f2d24',fontSize:'14px'}}>
+            {adminError}
+          </div>
+        )}
+
+        {loadingCaregivers ? (
+          <p className="muted" style={{marginTop:'18px'}}>Loading caregivers…</p>
+        ) : visibleCaregivers.length ? (
+          <div style={{display:'grid',gap:'14px',marginTop:'18px'}}>
+            {visibleCaregivers.map(c=>(
+              <div key={c.id} style={{border:'1px solid #e4e7ec',borderRadius:'14px',padding:'16px',background:'#fff'}}>
+
+                <div style={{display:'flex',justifyContent:'space-between',gap:'14px',alignItems:'flex-start',flexWrap:'wrap'}}>
+
+                  <div>
+                    <div style={{display:'flex',alignItems:'center',gap:'9px',flexWrap:'wrap'}}>
+                      <h3 style={{margin:0}}>{c.display_name}</h3>
+                      <span style={statusStyle(c.public_status)}>
+                        {statusLabel(c.public_status)}
+                      </span>
+                    </div>
+                    <p style={{margin:'5px 0 0',color:'#667085'}}>
+                      {c.city || 'City not set'}{c.state ? `, ${c.state}` : ''} · {c.years_experience} years experience
+                    </p>
+                  </div>
+
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    {c.public_status!=='approved' && c.public_status!=='under_review' && (
+                      <button type="button" className="secondary" disabled={actionId===c.id} onClick={()=>changeStatus(c.id,'under_review')}>
+                        Review
+                      </button>
+                    )}
+                    {c.public_status!=='approved' && (
+                      <button type="button" className="primary" disabled={actionId===c.id} onClick={()=>changeStatus(c.id,'approved')}>
+                        Approve
+                      </button>
+                    )}
+                    {c.public_status!=='rejected' && (
+                      <button type="button" className="secondary" disabled={actionId===c.id} onClick={()=>changeStatus(c.id,'rejected')}>
+                        Reject
+                      </button>
+                    )}
+                    {c.public_status==='approved' && (
+                      <button type="button" className="secondary" disabled={actionId===c.id} onClick={()=>changeStatus(c.id,'suspended')}>
+                        Suspend
+                      </button>
+                    )}
+                    {c.public_status==='suspended' && (
+                      <button type="button" className="primary" disabled={actionId===c.id} onClick={()=>changeStatus(c.id,'approved')}>
+                        Reactivate
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+
+                <div style={{marginTop:'13px',display:'grid',gap:'7px'}}>
+                  <p style={{margin:0,lineHeight:1.5}}>
+                    {c.bio || 'No caregiver bio provided yet.'}
+                  </p>
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    {c.services.length ? c.services.map(s=>(
+                      <span key={s.service_type} style={{padding:'6px 9px',borderRadius:'8px',background:'#f5f7fa',fontSize:'13px'}}>
+                        {s.service_type==='walking' ? '🐕 Dog walking' : '🏡 Day care'} · {money(s.rate_cents/100)}{s.active ? '' : ' · inactive'}
+                      </span>
+                    )) : (
+                      <span className="muted">No services configured.</span>
+                    )}
+                  </div>
+                  {c.rejection_reason && (
+                    <small style={{color:'#9f2d24'}}>
+                      Rejection reason: {c.rejection_reason}
+                    </small>
+                  )}
+                </div>
+
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty small" style={{marginTop:'18px'}}>
+            <div>🐾</div>
+            <h3>No caregivers in this status</h3>
+            <p>New caregiver registrations will appear here after they create their caregiver profile.</p>
+          </div>
+        )}
 
       </div>
 
