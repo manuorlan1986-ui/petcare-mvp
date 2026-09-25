@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {supabase} from './supabase';
-import {demoCaregivers, services} from './data';
+import {services} from './data';
 import type {Booking, Caregiver, Role, ServiceType} from './types';
 import {
   Search,
@@ -50,10 +50,10 @@ function App(){
   const [service,setService] =
     useState<ServiceType|'all'>('all');
 
-  const [city,setCity] = useState('Miami');
+  const [city,setCity] = useState('');
 
   const [caregivers,setCaregivers] =
-    useState<Caregiver[]>(demoCaregivers);
+    useState<Caregiver[]>([]);
 
   const [selected,setSelected] =
     useState<Caregiver|null>(null);
@@ -212,9 +212,9 @@ function App(){
         return;
       }
 
-      if(data?.length){
-        setCaregivers(data as Caregiver[]);
-      }
+      // Supabase is the only source of truth for public caregivers.
+      // Never fall back to demo data in production.
+      setCaregivers((data ?? []) as Caregiver[]);
 
     }catch(error){
 
@@ -231,7 +231,7 @@ function App(){
     return caregivers.filter(c=>
       (service==='all' || c.services.includes(service)) &&
       (!city ||
-        c.city
+        (c.city ?? '')
           .toLowerCase()
           .includes(city.toLowerCase()))
     );
